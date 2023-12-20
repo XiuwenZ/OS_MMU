@@ -1,0 +1,43 @@
+Enter logical memory size: 1024
+Enter page size: 64
+Enter physical memory size: 512
+
+Choose an option:
+1. Allocate Memory
+2. Deallocate Memory
+3. Access Memory
+4. Exit
+1
+Enter number of pages to allocate: 3
+Allocated 3 pages in physical memory for process 1
+Memory State:
+P1:0 P1:1 P1:2 Free Free Free Free Free 
+
+
+Choose an option:
+1. Allocate Memory
+2. Deallocate Memory
+3. Access Memory
+4. Exit
+3
+Enter process ID for memory access: 1
+Enter logical address for memory access: 150
+Accessing logical address 150 for process 1. Physical address: 150
+
+Choose an option:
+1. Allocate Memory
+2. Deallocate Memory
+3. Access Memory
+4. Exit
+2
+Enter process ID to deallocate memory: 1
+Deallocated memory for process 1
+Memory State:
+Free Free Free Free Free Free Free Free 
+
+
+Choose an option:
+1. Allocate Memory
+2. Deallocate Memory
+3. Access Memory
+4. Exit
