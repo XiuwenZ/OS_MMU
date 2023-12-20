@@ -6,18 +6,20 @@ class MemoryManager {
     private final int logicalMemorySize;
     private final int pageSize;
     private final int physicalMemorySize;
-    private final Map<Integer, PageInfo> pageTable;
+    private final PageTable pageTable;
     private final PageEntry[] physicalMemory;
+    private int nextProcessId; // Automatically generated process ID
 
     public MemoryManager(int logicalMemorySize, int pageSize, int physicalMemorySize) {
         this.logicalMemorySize = logicalMemorySize;
         this.pageSize = pageSize;
         this.physicalMemorySize = physicalMemorySize;
-        this.pageTable = new HashMap<>();
+        this.pageTable = new PageTable();
         this.physicalMemory = new PageEntry[physicalMemorySize / pageSize];
+        this.nextProcessId = 1; // Start with process ID 1
     }
 
-    public void allocateMemory(int processId, int numPages) {
+    public void allocateMemory(int numPages) {
         if (numPages * pageSize > logicalMemorySize) {
             System.out.println("Error: Not enough logical memory for allocation");
             return;
@@ -38,7 +40,8 @@ class MemoryManager {
         }
 
         // Allocate pages in the page table
-        pageTable.put(processId, new PageInfo(freePages, numPages));
+        int processId = nextProcessId++;
+        pageTable.allocatePages(processId, freePages, numPages);
 
         // Allocate pages in physical memory
         for (int i = 0; i < numPages; i++) {
@@ -46,15 +49,37 @@ class MemoryManager {
         }
 
         System.out.println("Allocated " + numPages + " pages in physical memory for process " + processId);
+        displayMemoryState();
+    }
+
+    public void deallocateMemory(int processId) {
+        if (!pageTable.containsProcess(processId)) {
+            System.out.println("Error: Process " + processId + " not found in page table");
+            return;
+        }
+
+        PageInfo pageInfo = pageTable.getPageInfo(processId);
+        int[] allocatedPages = pageInfo.getPages();
+
+        // Deallocate pages in the page table
+        pageTable.deallocatePages(processId);
+
+        // Deallocate pages in physical memory
+        for (int allocatedPage : allocatedPages) {
+            physicalMemory[allocatedPage] = null;
+        }
+
+        System.out.println("Deallocated memory for process " + processId);
+        displayMemoryState();
     }
 
     public int accessMemory(int processId, int logicalAddress) {
-        if (!pageTable.containsKey(processId)) {
+        if (!pageTable.containsProcess(processId)) {
             System.out.println("Error: Process " + processId + " not found in page table");
             return -1;
         }
 
-        PageInfo pageInfo = pageTable.get(processId);
+        PageInfo pageInfo = pageTable.getPageInfo(processId);
         int pageNum = logicalAddress / pageSize;
 
         if (pageNum >= pageInfo.getNumPages()) {
@@ -83,6 +108,22 @@ class MemoryManager {
         }
 
         return null;
+    }
+
+    private void displayMemoryState() {
+        System.out.println("Memory State:");
+        for (int i = 0; i < physicalMemory.length; i++) {
+            if (physicalMemory[i] == null) {
+                System.out.print("Free ");
+            } else {
+                System.out.print("P" + physicalMemory[i].getProcessId() + ":" + physicalMemory[i].getPageNum() + " ");
+            }
+
+            if ((i + 1) % (physicalMemorySize / pageSize) == 0) {
+                System.out.println();
+            }
+        }
+        System.out.println();
     }
 
     private static class PageInfo {
@@ -121,6 +162,30 @@ class MemoryManager {
         }
     }
 
+    private class PageTable {
+        private final Map<Integer, PageInfo> table;
+
+        public PageTable() {
+            this.table = new HashMap<>();
+        }
+
+        public void allocatePages(int processId, int[] pages, int numPages) {
+            table.put(processId, new PageInfo(pages, numPages));
+        }
+
+        public void deallocatePages(int processId) {
+            table.remove(processId);
+        }
+
+        public boolean containsProcess(int processId) {
+            return table.containsKey(processId);
+        }
+
+        public PageInfo getPageInfo(int processId) {
+            return table.get(processId);
+        }
+    }
+
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
@@ -135,27 +200,50 @@ class MemoryManager {
 
         MemoryManager memoryManager = new MemoryManager(logicalMemorySize, pageSize, physicalMemorySize);
 
-        System.out.print("Enter process ID for memory allocation: ");
-        int processId = scanner.nextInt();
+        while (true) {
+            System.out.println("\nChoose an option:");
+            System.out.println("1. Allocate Memory");
+            System.out.println("2. Deallocate Memory");
+            System.out.println("3. Access Memory");
+            System.out.println("4. Exit");
 
-        System.out.print("Enter number of pages to allocate: ");
-        int numPages = scanner.nextInt();
+            int choice = scanner.nextInt();
 
-        memoryManager.allocateMemory(processId, numPages);
+            switch (choice) {
+                case 1:
+                    System.out.print("Enter number of pages to allocate: ");
+                    int numPages = scanner.nextInt();
+                    memoryManager.allocateMemory(numPages);
+                    break;
 
-        System.out.print("Enter process ID for memory access: ");
-        processId = scanner.nextInt();
+                case 2:
+                    System.out.print("Enter process ID to deallocate memory: ");
+                    int processId = scanner.nextInt();
+                    memoryManager.deallocateMemory(processId);
+                    break;
 
-        System.out.print("Enter logical address for memory access: ");
-        int logicalAddress = scanner.nextInt();
+                case 3:
+                    System.out.print("Enter process ID for memory access: ");
+                    int accessProcessId = scanner.nextInt();
 
-        int physicalAddress = memoryManager.accessMemory(processId, logicalAddress);
+                    System.out.print("Enter logical address for memory access: ");
+                    int logicalAddress = scanner.nextInt();
 
-        if (physicalAddress != -1) {
-            System.out.println("Accessing logical address " + logicalAddress + " for process " + processId +
-                    ". Physical address: " + physicalAddress);
+                    int physicalAddress = memoryManager.accessMemory(accessProcessId, logicalAddress);
+
+                    if (physicalAddress != -1) {
+                        System.out.println("Accessing logical address " + logicalAddress + " for process " +
+                                accessProcessId + ". Physical address: " + physicalAddress);
+                    }
+                    break;
+
+                case 4:
+                    scanner.close();
+                    System.exit(0);
+
+                default:
+                    System.out.println("Invalid option. Please try again.");
+            }
         }
-
-        scanner.close();
     }
 }
